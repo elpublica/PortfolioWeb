@@ -22,4 +22,16 @@ export default {
   getExperiencias() {
     return apiClient.get("/Experiencia");
   },
+  getConocimientos() {
+    return apiClient.get("/Conocimientos");
+  },
+  getHabilidades() {
+    return apiClient.get("/Habilidades"); // O como se llame tu controlador
+  },
+  getEstudios() {
+    return apiClient.get("/Estudios");
+  },
+  getRedesSociales() {
+    return apiClient.get("/RedesSociales");
+  },
 };
