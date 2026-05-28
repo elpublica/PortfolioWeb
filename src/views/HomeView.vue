@@ -1,5 +1,6 @@
 <template>
   <div class="home-container background: red">
+    <Toast />
     <div v-if="perfil" class="content-wrapper">
       
      <Card class="profile-card shadow-lg mb-8">
@@ -61,30 +62,29 @@
 
             </div>
 
-            <!-- Redes Sociales -->
             <div class="flex justify-content-center gap-4 mt-5">
-              <Button 
-                v-for="red in redes" 
-                :key="red.id"
-                :icon="red.iconoClass" 
-                rounded 
-                size="large" 
-                :class="['social-btn', getBtnClass(red.plataforma)]" 
-                v-tooltip.top="red.plataforma"
-                @click="abrirLink(red.url)" 
-              />
-              
-              <Button 
-                v-if="perfil"
-                icon="pi pi-envelope" 
-                severity="success" 
-                rounded 
-                size="large" 
-                class="social-btn email-btn" 
-                v-tooltip.top="'Enviar Correo'"
-                @click="abrirLink('mailto:' + perfil.correo)" 
-              />
-            </div>
+              <Toast/>
+  <Button 
+    v-for="red in redes" 
+    :key="red.id"
+    :icon="red.iconoClass" 
+    rounded 
+    size="large" 
+    :class="['social-btn', getBtnClass(red.plataforma)]" 
+    v-tooltip.top="red.plataforma"
+    @click="abrirLink(red.url)" 
+  />
+  
+  <Button 
+    v-if="perfil"
+    icon="pi pi-envelope" 
+    severity="success" 
+    rounded 
+    size="large" 
+    class="social-btn email-btn" 
+    v-tooltip.top="'Click para copiar y enviar'"
+    @click="copiarYEnviarCorreo" />
+</div>
 
         </div>
 
@@ -105,7 +105,13 @@
                 <div class="tech-tags mt-auto">
                   <Tag v-for="tech in slotProps.data.tecnologias.split(',')" :key="tech" :value="tech.trim()" severity="secondary" />
                 </div>
-                <Button label="Ver Detalles" icon="pi pi-search" class="mt-3 p-button-sm w-full" outlined />
+                <Button 
+  label="Ver Detalles" 
+  icon="pi pi-search" 
+  class="mt-3 p-button-sm w-full" 
+  outlined 
+  @click="verDetalles(slotProps.data)" 
+/>
               </div>
             </div>
           </template>
@@ -175,11 +181,59 @@
 
     </div>
   </div>
+<Dialog 
+    v-model:visible="displayModal" 
+    :header="proyectoSeleccionado?.nombre" 
+    :style="{ width: '50vw' }" 
+    :breakpoints="{ '960px': '85vw', '641px': '95vw' }" 
+    modal
+>
+    <div v-if="proyectoSeleccionado" class="flex flex-column align-items-center">
+        
+        <div class="img-wrapper mb-4">
+            <img :src="proyectoSeleccionado.imagenUrl" class="custom-img" />
+        </div>
+
+        <div class="flex flex-wrap justify-content-center gap-2 mb-4">
+            <Tag v-for="tech in proyectoSeleccionado.tecnologias.split(',')" 
+                 :key="tech" :value="tech.trim()" 
+                 severity="success" />
+        </div>
+
+        <div class="w-full px-2" style="text-align: left;">
+            <div class="mb-4">
+                <h5 class="flex align-items-center mb-1" style="color: #34d399; font-size: 1.1rem;">
+                    <i class="pi pi-info-circle mr-2"></i> Contexto
+                </h5>
+                <p class="m-0 text-gray-300 line-height-3">{{ proyectoSeleccionado.contextoProblema }}</p>
+            </div>
+
+            <div class="mb-4">
+                <h5 class="flex align-items-center mb-1" style="color: #34d399; font-size: 1.1rem;">
+                    <i class="pi pi-cog mr-2"></i> Solución
+                </h5>
+                <p class="m-0 text-gray-300 line-height-3">{{ proyectoSeleccionado.solucionImplementada }}</p>
+            </div>
+
+            <div class="mb-2">
+                <h5 class="flex align-items-center mb-1" style="color: #34d399; font-size: 1.1rem;">
+                    <i class="pi pi-chart-line mr-2"></i> Logros
+                </h5>
+                <p class="m-0 text-gray-300 line-height-3">{{ proyectoSeleccionado.resultadosLogros }}</p>
+            </div>
+        </div>
+    </div>
+</Dialog>
 </template>
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
 import api from '../services/api';
+import { mockData } from '../data/mockData';
+import { useToast } from "primevue/usetoast";
+import Toast from 'primevue/toast'; 
+import Tooltip from 'primevue/tooltip';
+import Dialog from 'primevue/dialog';
 // Componentes PrimeVue
 import Card from 'primevue/card';
 import Button from 'primevue/button';
@@ -197,6 +251,8 @@ const conocimientos = ref([]);
 const habilidades = ref([]);
 const estudios = ref([]);
 
+const toast = useToast();
+
 // Configuración responsiva para Carrusel
 const responsiveOptions = ref([
     { breakpoint: '1400px', numVisible: 2, numScroll: 1 },
@@ -205,37 +261,57 @@ const responsiveOptions = ref([
     { breakpoint: '575px', numVisible: 1, numScroll: 1 }
 ]);
 
-onMounted(async () => {
-  try {
-    const [
-      perfilRes,
-      redesRes,
-      proyectosRes,
-      experienciasRes,
-      conocimientosRes,
-      habilidadesRes,
-      estudiosRes
-    ] = await Promise.all([
-      api.getPerfil(),
-      api.getRedesSociales(),
-      api.getProyectos(),
-      api.getExperiencias(),
-      api.getConocimientos(),
-      api.getHabilidades(),
-      api.getEstudios()
-    ]);
+const displayModal = ref(false);
+const proyectoSeleccionado = ref(null);
 
-    perfil.value = perfilRes.data;
-    redes.value = redesRes.data;
-    proyectos.value = proyectosRes.data;
-    experiencias.value = experienciasRes.data;
-    conocimientos.value = conocimientosRes.data;
-    habilidades.value = habilidadesRes.data;
-    estudios.value = estudiosRes.data;
+const verDetalles = (proyecto) => {
+    proyectoSeleccionado.value = proyecto;
+    displayModal.value = true;
+};
 
-  } catch (e) {
-    console.error('Error cargando datos', e);
-  }
+// onMounted(async () => {
+//   try {
+//     const [
+//       perfilRes,
+//       redesRes,
+//       proyectosRes,
+//       experienciasRes,
+//       conocimientosRes,
+//       habilidadesRes,
+//       estudiosRes
+//     ] = await Promise.all([
+//       api.getPerfil(),
+//       api.getRedesSociales(),
+//       api.getProyectos(),
+//       api.getExperiencias(),
+//       api.getConocimientos(),
+//       api.getHabilidades(),
+//       api.getEstudios()
+//     ]);
+
+//     perfil.value = perfilRes.data;
+//     redes.value = redesRes.data;
+//     proyectos.value = proyectosRes.data;
+//     experiencias.value = experienciasRes.data;
+//     conocimientos.value = conocimientosRes.data;
+//     habilidades.value = habilidadesRes.data;
+//     estudios.value = estudiosRes.data;
+
+//   } catch (e) {
+//     console.error('Error cargando datos', e);
+//   }
+// });
+
+onMounted(() => {
+  // 2. En lugar de api.get, asignamos directamente los valores
+  // Esto simula la respuesta de la API pero de forma instantánea
+  perfil.value = mockData.perfil;
+  redes.value = mockData.redes;
+  proyectos.value = mockData.proyectos;
+  experiencias.value = mockData.experiencias;
+  conocimientos.value = mockData.conocimientos;
+  habilidades.value = mockData.habilidades;
+  estudios.value = mockData.estudios;
 });
 
 const techStack = computed(() => {
@@ -250,15 +326,32 @@ const abrirLink = (url) => {
   }
 };
 
-// const getSocialColor = (plataforma) => {
-//   const colors = {
-//     'LinkedIn': '#0077b5',
-//     'GitHub': '#333',
-//     'Facebook': '#1877f2',
-//     'Instagram': '#e4405f'
-//   };
-//   return colors[plataforma] || '#6366f1'; // Color por defecto
-// };
+const copiarYEnviarCorreo = async () => {
+  const email = perfil.value?.correo;
+
+  if (!email) return;
+
+  // 1. PRIMERO intentamos copiar
+  try {
+    // Intentar copiar al portapapeles
+    await navigator.clipboard.writeText(email);
+    
+    toast.add({ 
+      severity: 'success', 
+      summary: '¡Copiado!', 
+      detail: 'Correo listo para pegar', 
+      life: 3000 
+    });
+  } catch (err) {
+    // Si falla el copiado, al menos lo logueamos, pero seguimos adelante
+    console.warn("El portapapeles fue bloqueado por el navegador.");
+  }
+
+  // 2. DESPUÉS activamos el mailto (esto suele quitarle el foco a la ventana)
+  setTimeout(() => {
+    window.location.href = `mailto:${email}`;
+  }, 100); // Un pequeño retraso para asegurar que el toast y el copiado se procesen
+};
 
 const getBtnClass = (plataforma) => {
   if (!plataforma) return '';
@@ -450,14 +543,6 @@ const getBtnClass = (plataforma) => {
 /* =========================
    BOTONES SOCIALES
 ========================= */
-/* .social-btn {
-  width: 3.8rem !important;
-  height: 3.8rem !important;
-  margin: 0 0.5rem;
-   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-} */
 
 .social-btn {
   width: 4rem !important;
@@ -479,6 +564,49 @@ const getBtnClass = (plataforma) => {
   filter: brightness(1.2);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
 }
+
+/*Dialog */
+/* Atacamos las variables internas del componente Dialog */
+:deep(.p-dialog) {
+    --p-dialog-background: #18181b; /* Fondo oscuro */
+    --p-dialog-color: #f4f4f5;      /* Texto claro */
+    --p-dialog-border-color: #3f3f46;
+    background: var(--p-dialog-background) !important;
+    border: 1px solid var(--p-dialog-border-color) !important;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Encabezado */
+:deep(.p-dialog-header) {
+    background: #18181b !important;
+    color: #34d399 !important; /* Título esmeralda */
+    justify-content: center !important; 
+    padding-top: 2rem !important;
+}
+
+/* El contenido donde está la info */
+:deep(.p-dialog-content) {
+    background: #18181b !important;
+    color: #d4d4d8 !important;
+    padding: 1rem 2rem 2rem 2rem !important;
+}
+
+/* Imagen centrada y con estilo */
+.img-wrapper {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.custom-img {
+    max-height: 280px;
+    width: auto;
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+
 
 /* =========================
    RESPONSIVE
@@ -564,6 +692,23 @@ const getBtnClass = (plataforma) => {
 .project-img { width: 100%; height: 180px; object-fit: cover; }
 .project-info { padding: 1.2rem; flex-grow: 1; display: flex; flex-direction: column; }
 .resumen { color: #a1a1aa; font-size: 0.9rem; margin: 10px 0; }
+
+/* Estilo para el Dialog en modo oscuro */
+:deep(.p-dialog) {
+    background: #18181b !important; /* El mismo gris oscuro de tu card */
+    color: #f4f4f5 !important;
+    border: 1px solid #27272a;
+}
+
+:deep(.p-dialog-header) {
+    background: #18181b !important;
+    color: #34d399 !important; /* Color esmeralda para el título */
+}
+
+:deep(.p-dialog-content) {
+    background: #18181b !important;
+    padding-top: 1rem;
+}
 
 /* Timeline */
 .timeline-card { background: #18181b !important; border: 1px solid #27272a !important; margin-bottom: 1rem; }

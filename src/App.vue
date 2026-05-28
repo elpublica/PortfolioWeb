@@ -21,13 +21,17 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import Menubar from 'primevue/menubar';
 
 const items = ref([
     { label: 'Portafolio', icon: 'pi pi-user', to: '/' },
     { label: 'Administración', icon: 'pi pi-cog', to: '/admin' }
 ]);
+
+onMounted(() => {
+  document.documentElement.classList.add('my-app-dark');
+});
 </script>
 
 <style>
